@@ -700,6 +700,9 @@ class TransformersStreamer():
                         }
                         self.str_pos[i] = len(self.generated_string[i])
                         put_data = True
+
+                        print(out)
+
                 self.sequence_pos[i] = len(self.generated_sequence[i])
         
         if put_data:
