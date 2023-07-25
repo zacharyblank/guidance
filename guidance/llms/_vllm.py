@@ -147,7 +147,7 @@ class VLLM(LLM):
         if isinstance(model, str):
             if tokenizer is None:
                 tokenizer = transformers.AutoTokenizer.from_pretrained(model, **kwargs)
-            model = _vLLM(model=model, **kwargs)
+            model = _vLLM(model=model, max_num_batched_tokens=8192, **kwargs)
         
         assert tokenizer is not None, "You must give a tokenizer object when you provide a model object (as opposed to just a model name)!"
             
@@ -264,7 +264,6 @@ class VLLMSession(LLMSession):
                 encoded = encoded.to(self.llm.device)
             input_ids = encoded["input_ids"]
             attention_mask = encoded["attention_mask"]
-            model_config = self.llm.model_obj.llm_engine.model_config
 
             # ensure that we are extending a common sequence batch (our token healing assumes this right now)
             assert (input_ids[0,-1] == input_ids[:,-1]).all(), "The current token healing implementation assumes that batches are reps of the same sequence!"
@@ -277,20 +276,6 @@ class VLLMSession(LLMSession):
             # save what the prompt looks like when coded and then decoded (this captures added start tokens, etc.)
             coded_prompt = self.llm.decode(input_ids[0])
 
-            # setup token healing
-            print(f"Token Healing: {token_healing}")
-            if True: #if token_healing:
-                # pop off the last token since we will regen it
-                last_token_id = input_ids[0][-1]
-                last_token_str = self.llm._tokenizer.decode([last_token_id])
-                healer = TokenHealingLogitsProcessor(self.llm, model_config.vocab_size, last_token_str)
-                if healer.should_bias:
-                    input_ids = input_ids[:,:-1]
-                    attention_mask = attention_mask[:,:-1]
-                    max_tokens += 1 # add one for the token we regen for token healing
-                    processors.append(healer)
-                else:
-                    last_token_str = ""
 
             # setup logit biasing
             if logit_bias is not None:
@@ -379,6 +364,8 @@ class VLLMSession(LLMSession):
                     output.logprobs[idx][token] = logprob.pop(token_id)
 
                 output.logprobs = sorted(output.logprobs, key=lambda x: list(x.values())[0], reverse=True)
+
+                print(f"LOGPROBS: {output.logprobs}")
 
                 response.append({
                     "text": output.text,
