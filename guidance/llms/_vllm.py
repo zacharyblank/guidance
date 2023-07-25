@@ -9,7 +9,7 @@ from typing import Dict
 
 import threading
 import logging
-from vllm.vllm import LLM as _vLLM, SamplingParams
+from vllm import LLM as _vLLM, SamplingParams
 from vllm.logits_processors import LogitsProcessor
 from ._llm import LLM, LLMSession, SyncSession
 
