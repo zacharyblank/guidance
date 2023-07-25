@@ -273,7 +273,7 @@ class VLLMSession(LLMSession):
             logprobs = 0
             processors = []
             stoppers = []
-
+            model_config = self.llm.model_obj.llm_engine.model_config.hf_config
             # save what the prompt looks like when coded and then decoded (this captures added start tokens, etc.)
             coded_prompt = self.llm.decode(input_ids[0])
 
@@ -283,7 +283,7 @@ class VLLMSession(LLMSession):
                 # pop off the last token since we will regen it
                 last_token_id = input_ids[0][-1]
                 last_token_str = self.llm._tokenizer.decode([last_token_id])
-                healer = TokenHealingLogitsProcessor(self.llm, self.llm._tokenizer.vocab_size, last_token_str)
+                healer = TokenHealingLogitsProcessor(self.llm, model_config.vocab_size, last_token_str)
                 if healer.should_bias:
                     input_ids = input_ids[:,:-1]
                     attention_mask = attention_mask[:,:-1]
@@ -378,6 +378,8 @@ class VLLMSession(LLMSession):
                     token = self.llm._tokenizer.convert_ids_to_tokens(token_id)
                     output.logprobs[idx][token] = logprob.pop(token_id)
 
+                output.logprobs = sorted(output.logprobs, key=lambda x: list(x.values())[0], reverse=True)
+
                 response.append({
                     "text": output.text,
                     "logprobs": {
@@ -447,7 +449,7 @@ class TokenHealingLogitsProcessor(LogitsProcessor):
         
         # if we have multiple possible completions past the last token, then biasing is needed
         if len(allowed_first_tokens) > 1:
-            self.first_token_mask = torch.zeros(50272) # TODO: Fix this hard coded value
+            self.first_token_mask = torch.zeros(vocab_size) # TODO: Fix this hard coded value
             self.first_token_mask.scatter_(0, torch.tensor(allowed_first_tokens), bias_value)
             if model.device is not None:
                 self.first_token_mask = self.first_token_mask.to(model.device)
@@ -526,10 +528,6 @@ class BiasLogitsProcessor(LogitsProcessor):
 
         update_factors = torch.where(values >= 0, 1 + (values / 100), 1 / (1 - (values / 100)))
         logits[0, keys] *= update_factors
-
-        logits = torch.zeros(logits.shape)
-
-        logits[0][6219] = 23
 
         return logits
 
