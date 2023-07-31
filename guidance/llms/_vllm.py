@@ -354,6 +354,7 @@ class VLLMSession(LLMSession):
 
             outputs = self.llm.model_obj.generate(prompt, sampling_params)
             
+            print(f"OUTPUTS: {outputs}")
 
             response = []
             for output in outputs[0].outputs:
@@ -369,6 +370,7 @@ class VLLMSession(LLMSession):
 
                 response.append({
                     "text": output.text,
+                    "finish_reason": output.finish_reason,
                     "logprobs": {
                         "token_healing_prefix": last_token_str,
                         "top_logprobs": output.logprobs
@@ -506,7 +508,12 @@ class BiasLogitsProcessor(LogitsProcessor):
         self.keys = torch.tensor(list(self.biases.keys()), dtype=torch.long)
         self.values = torch.tensor(list(self.biases.values()), dtype=torch.long)
 
-    def __call__(self, logits: torch.tensor, input_ids: Dict[int, int]) -> torch.tensor:
+    def __call__(self, logits: torch.tensor, *args, **kwargs) -> torch.tensor:
+        if args:
+            logging.info(args)
+        if kwargs:
+            logging.info(kwargs)
+
         if not self.biases:
             return logits
 
