@@ -147,7 +147,7 @@ class VLLM(LLM):
         if isinstance(model, str):
             if tokenizer is None:
                 tokenizer = transformers.AutoTokenizer.from_pretrained(model, **kwargs)
-            model = _vLLM(model=model, max_num_batched_tokens=8192, **kwargs)
+            model = _vLLM(model=model, **kwargs)
         
         assert tokenizer is not None, "You must give a tokenizer object when you provide a model object (as opposed to just a model name)!"
             
@@ -276,12 +276,10 @@ class VLLMSession(LLMSession):
             # save what the prompt looks like when coded and then decoded (this captures added start tokens, etc.)
             coded_prompt = self.llm.decode(input_ids[0])
 
-
             # setup logit biasing
             if logit_bias is not None:
                 processors.append(BiasLogitsProcessor(logit_bias))
                 logprobs = len(logit_bias)
-                print(f"num lgo probs: {logprobs}")
 
             # make sure we don't run off the end of the model
             # TODO: Calculate
@@ -327,8 +325,6 @@ class VLLMSession(LLMSession):
                 logits_processors=processors
             )
 
-            print(sampling_params)
-
             # # the args for the transformers generate call
             # generate_args = dict(
             #     inputs=input_ids,
@@ -352,10 +348,10 @@ class VLLMSession(LLMSession):
             # elif do_sample is False and temperature > 0:
             #     generate_args["do_sample"] = True
 
+            print(f"Prompt: {prompt.split('### Response')[1].strip()}")
+
             outputs = self.llm.model_obj.generate(prompt, sampling_params)
             
-            print(f"OUTPUTS: {outputs}")
-
             response = []
             for output in outputs[0].outputs:
 
@@ -366,7 +362,7 @@ class VLLMSession(LLMSession):
 
                 output.logprobs = sorted(output.logprobs, key=lambda x: list(x.values())[0], reverse=True)
 
-                print(f"LOGPROBS: {output.logprobs}")
+                # print(f"Generated Text: {output.text}")
 
                 response.append({
                     "text": output.text,
